@@ -1,0 +1,12 @@
+dnsmasq-resolv.conf
+dnsmasq.enabled/
+ImageMagick*
+bash_completion.d
+fonts/
+mercurial/
+mono/
+nginx/
+openssl/
+pango/
+wgetrc
+wgetrc.default

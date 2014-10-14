@@ -1,0 +1,80 @@
+#!/bin/bash
+
+source /usr/local/etc/dns-watch/settings
+
+function up {
+    grep -q "nameserver $VPN_DNS_SERVER_PREFIX" /etc/resolv.conf
+    res=$?
+
+    if [ $res -ne 0 ]; then
+        echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: VPN already configured.
+        exit
+    fi
+
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: VPN is active, enabling split DNS
+
+    ln -f -s /usr/local/etc/dnsmasq.available/vpn.conf /usr/local/etc/dnsmasq.enabled/
+
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: stop dnsmasq
+    launchctl stop homebrew.mxcl.dnsmasq-regex
+    
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: start dnsmasq
+    launchctl start homebrew.mxcl.dnsmasq-regex
+    
+    SERVICE=`echo "show State:/Network/Global/IPv4" | scutil | awk '/PrimaryService/ { print $3 }'`
+    KEY="State:/Network/Service/$SERVICE/DNS"
+
+    scutil <<-EOT
+        open
+        get $KEY
+        d.add ServerAddresses * 127.0.0.1
+        d.add SearchDomains * $LOCAL_SEARCH_DOMAINS $VPN_SEARCH_DOMAINS
+        set $KEY
+        close
+EOT
+
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: reload discoveryd
+    killall -HUP discoveryd
+}
+
+function down {
+    if [ ! -f /usr/local/etc/dnsmasq.enabled/vpn.conf ]; then
+        echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns:  VPN dnsmasq not configured.
+        exit
+    fi
+
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: Removing VPN DNS servers from dnsmasq.
+
+    rm -f /usr/local/etc/dnsmasq.enabled/vpn.conf
+    
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: stop dnsmasq
+    launchctl stop homebrew.mxcl.dnsmasq-regex
+    
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: start dnsmasq
+    launchctl start homebrew.mxcl.dnsmasq-regex
+
+    SERVICE=`echo "show State:/Network/Global/IPv4" | scutil | awk '/PrimaryService/ { print $3 }'`
+    KEY="State:/Network/Service/$SERVICE/DNS"
+
+    scutil <<-EOT
+        open
+        get $KEY
+        d.add ServerAddresses * 127.0.0.1
+        d.add SearchDomains * $LOCAL_SEARCH_DOMAINS
+        set $KEY
+        close
+EOT
+    
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: reload discoveryd
+    killall -HUP discoveryd
+}
+
+sleep 3
+echo -n "`date +%Y-%m-%dT%H:%M:%S` vpn-dns: resolv.conf changed; VPN appears to be " >>$LOG
+if ifconfig utun0 2>/dev/null | grep -q UP; then
+    echo up >>$LOG
+    up >>$LOG 2>&1
+else
+    echo down >>$LOG
+    down >>$LOG 2>&1
+fi

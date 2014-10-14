@@ -1,0 +1,54 @@
+#!/bin/bash
+
+source /usr/local/etc/dns-watch/settings
+
+function go {
+    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: new lease
+
+    SERVICE=`echo "show State:/Network/Global/IPv4" | scutil | awk '/PrimaryService/ { print $3 }'`
+    KEY="State:/Network/Service/$SERVICE/DNS"
+
+    tmpfile=/tmp/scutil$$.txt
+    scutil >$tmpfile <<-EOT
+        open
+        get $KEY
+        d.show
+EOT
+
+    SERVERS=`sed -n '/ServerAddresses/,/}/p' $tmpfile | tr -d ' ' | grep -e '^\d' | cut -d: -f2 | grep -v "^VPN_DNS_SERVER_PREFIX"`
+
+    rm -f $tmpfile
+
+    if [ "$SERVERS" == "127.0.0.1" ]; then
+        echo `date +%Y-%m-%dT%H:%M:%S` local-dns: dnsmasq already configured.
+        exit
+    fi
+
+    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: telling dnsmasq to use $SERVERS.
+    resolv_conf=/usr/local/etc/dnsmasq-resolv.conf
+    > $resolv_conf
+    for i in $SERVERS; do
+        echo nameserver $i >>$resolv_conf
+    done
+
+    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: stop dnsmasq
+    launchctl stop homebrew.mxcl.dnsmasq-regex
+    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: start dnsmasq
+    launchctl start homebrew.mxcl.dnsmasq-regex
+
+    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: setting network DNS back to 127.0.0.1
+
+    scutil <<-EOT
+        open
+        get $KEY
+        d.add ServerAddresses * 127.0.0.1
+        d.add SearchDomains * $LOCAL_SEARCH_DOMAINS
+        set $KEY
+        close
+EOT
+
+    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: reload discoveryd
+    killall -HUP discoveryd
+}
+
+go >>$LOG 2>&1
