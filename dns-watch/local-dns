@@ -47,8 +47,8 @@ EOT
         close
 EOT
 
-    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: reload discoveryd
-    killall -HUP discoveryd
+    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: reload $DNS_SERVICE
+    killall -HUP $DNS_SERVICE
 }
 
 go >>$LOG 2>&1

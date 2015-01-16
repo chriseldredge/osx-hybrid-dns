@@ -1,5 +1,6 @@
 #!/bin/bash
 
+DNS_SERVICE=mDNSResponder
 LOCAL_SEARCH_DOMAINS="localnet"
 VPN_SEARCH_DOMAINS="example.com"
 VPN_DNS_SERVER_PREFIX='10\.10\.'

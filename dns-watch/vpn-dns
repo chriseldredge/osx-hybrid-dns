@@ -33,8 +33,8 @@ function up {
         close
 EOT
 
-    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: reload discoveryd
-    killall -HUP discoveryd
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: reload $DNS_SERVICE
+    killall -HUP $DNS_SERVICE
 }
 
 function down {
@@ -65,8 +65,8 @@ function down {
         close
 EOT
     
-    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: reload discoveryd
-    killall -HUP discoveryd
+    echo `date +%Y-%m-%dT%H:%M:%S` vpn-dns: reload $DNS_SERVICE
+    killall -HUP $DNS_SERVICE
 }
 
 sleep 3
