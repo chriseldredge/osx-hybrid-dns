@@ -75,12 +75,11 @@ function go {
 EOT
 
     shopt -s nullglob
-    ACTIVE_PROFILES=(/usr/local/etc/dnsmasq.enabled/*)
-    log ActiveProfiles: ${ACTIVE_PROFILES[*]}
+    ACTIVE_PROFILES=(/usr/local/etc/dnsmasq.enabled/*.profile)
 
     # Deactivate inactive services
     for path in ${ACTIVE_PROFILES[@]}; do
-        file=$(basename $path)
+        file=$(basename $path .profile)
         if [[ ! ${ALL_SERVICES[@]} =~ "$file" ]]; then
             log "disable dnsmasq profile $file"
             rm -f $path
@@ -88,9 +87,9 @@ EOT
     done
 
     for svc in ${ALL_SERVICES[@]}; do
-        if [ -f /usr/local/etc/dnsmasq.available/$svc ]; then
+        if [ -f /usr/local/etc/dnsmasq.available/${svc}.profile ]; then
             log "enable dnsmasq profile $svc"
-            ln -f -s /usr/local/etc/dnsmasq.available/$svc /usr/local/etc/dnsmasq.enabled
+            ln -f -s /usr/local/etc/dnsmasq.available/${svc}.profile /usr/local/etc/dnsmasq.enabled
         fi
     done
 
