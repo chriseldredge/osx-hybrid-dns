@@ -1,7 +1,5 @@
 #!/bin/bash
 
 DNS_SERVICE=mDNSResponder
-LOCAL_SEARCH_DOMAINS="localnet"
-VPN_SEARCH_DOMAINS="example.com"
-VPN_DNS_SERVER_PREFIX='10\.10\.'
 LOG=/var/log/dns-watch
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

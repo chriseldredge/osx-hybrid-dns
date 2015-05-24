@@ -3,7 +3,7 @@
 <plist version="1.0">
   <dict>
     <key>Label</key>
-    <string>local-dns</string>
+    <string>io.eldredge.dns-watch</string>
 
     <key>ProgramArguments</key>
     <array>
@@ -12,7 +12,9 @@
 
     <key>WatchPaths</key>
     <array>
-      <string>/private/var/db/dhcpclient/leases/</string>
+      <string>/var/run/resolv.conf</string>
+      <string>/Library/Preferences/SystemConfiguration/NetworkInterfaces.plist</string>
+      <string>/Library/Preferences/SystemConfiguration/com.apple.airport.preferences.plist</string>
     </array>
 
     <key>RunAtLoad</key>

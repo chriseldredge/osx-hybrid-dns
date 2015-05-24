@@ -2,52 +2,103 @@
 
 source /usr/local/etc/dns-watch/settings
 
+function log {
+    echo `date +%Y-%m-%dT%H:%M:%S` $0 $*
+}
+
 function go {
-    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: new lease
+    log network changed
 
-    SERVICE=`echo "show State:/Network/Global/IPv4" | scutil | awk '/PrimaryService/ { print $3 }'`
-    KEY="State:/Network/Service/$SERVICE/DNS"
+    PRIMARY_SERVICE=`echo "show State:/Network/Global/IPv4" | scutil | awk '/PrimaryService/ { print $3 }'`
 
-    tmpfile=/tmp/scutil$$.txt
-    scutil >$tmpfile <<-EOT
-        open
-        get $KEY
-        d.show
-EOT
-
-    SERVERS=`sed -n '/ServerAddresses/,/}/p' $tmpfile | tr -d ' ' | grep -e '^\d' | cut -d: -f2 | grep -v "^VPN_DNS_SERVER_PREFIX"`
-
-    rm -f $tmpfile
-
-    if [ "$SERVERS" == "127.0.0.1" ]; then
-        echo `date +%Y-%m-%dT%H:%M:%S` local-dns: dnsmasq already configured.
-        exit
+    if [ -z "${PRIMARY_SERVICE}" ]; then
+        log No PrimaryService is configured.
+        return
     fi
 
-    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: telling dnsmasq to use $SERVERS.
-    resolv_conf=/usr/local/etc/dnsmasq-resolv.conf
-    > $resolv_conf
-    for i in $SERVERS; do
-        echo nameserver $i >>$resolv_conf
+    PRIMARY_INTERFACE=`echo "show State:/Network/Global/IPv4" | scutil | awk '/PrimaryInterface/ { print $3 }'`
+
+    ALL_SERVICES=($(echo list | scutil | grep -e 'State:/Network/Service/.*/IPv4' | awk -F / '{print $4}'))
+
+    PRIMARY_DNS=
+
+    for KEY in ${ALL_SERVICES[@]}; do
+        if [ "$KEY" == "com.cisco.anyconnect" ]; then
+            continue
+        fi
+
+        echo show State:/Network/Service/$KEY/IPv4 | scutil | grep -s -q "ConfirmedInterfaceName : ${PRIMARY_INTERFACE}"
+        res=$?
+        if [ $res -eq 0 ]; then
+            PRIMARY_DNS=$(echo show State:/Network/Service/$KEY/DNS | scutil | grep -e '[0-9] : [0-9]' | tr -d ' ' | cut -d: -f2)
+            break
+        fi
     done
 
-    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: stop dnsmasq
-    launchctl stop homebrew.mxcl.dnsmasq-regex
-    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: start dnsmasq
-    launchctl start homebrew.mxcl.dnsmasq-regex
+    if [ -z "${PRIMARY_DNS}" ]; then
+        log "Unable to determine local network DNS servers."
+        return
+    fi
+    
+    SERVICE_DNS=$(echo show State:/Network/Service/$PRIMARY_SERVICE/DNS | scutil | grep -e '[0-9] : [0-9]' | tr -d ' ' | cut -d: -f2)
 
-    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: setting network DNS back to 127.0.0.1
+    log PrimaryInterface: $PRIMARY_INTERFACE
+    log PrimaryService: $PRIMARY_SERVICE
+    log PrimaryInterfaceDNS: $PRIMARY_DNS
+    log ActiveServices: ${ALL_SERVICES[*]}
 
+    if [ "$PRIMARY_DNS" != "$SERVICE_DNS" ]; then
+        log $PRIMARY_SERVICE DNS: $SERVICE_DNS
+    fi
+
+    if [ "$PRIMARY_DNS" == "127.0.0.1" ]; then
+        log "dnsmasq already configured."
+    else
+        log "telling dnsmasq to use $PRIMARY_DNS."
+
+        resolv_conf=/usr/local/etc/dnsmasq-resolv.conf
+        > $resolv_conf
+        for i in $PRIMARY_DNS; do
+            echo nameserver $i >>$resolv_conf
+        done
+    fi
+
+    log setting $PRIMARY_SERVICE DNS to 127.0.0.1
+
+    #TODO: determine correct search domains to use based on active services
     scutil <<-EOT
         open
-        get $KEY
+        get State:/Network/Service/$PRIMARY_SERVICE/DNS
         d.add ServerAddresses * 127.0.0.1
-        d.add SearchDomains * $LOCAL_SEARCH_DOMAINS
-        set $KEY
+        set State:/Network/Service/$PRIMARY_SERVICE/DNS
         close
 EOT
 
-    echo `date +%Y-%m-%dT%H:%M:%S` local-dns: reload $DNS_SERVICE
+    shopt -s nullglob
+    ACTIVE_PROFILES=(/usr/local/etc/dnsmasq.enabled/*)
+    log ActiveProfiles: ${ACTIVE_PROFILES[*]}
+
+    # Deactivate inactive services
+    for path in ${ACTIVE_PROFILES[@]}; do
+        file=$(basename $path)
+        if [[ ! ${ALL_SERVICES[@]} =~ "$file" ]]; then
+            log "disable dnsmasq profile $file"
+            rm -f $path
+        fi
+    done
+
+    for svc in ${ALL_SERVICES[@]}; do
+        if [ -f /usr/local/etc/dnsmasq.available/$svc ]; then
+            log "enable dnsmasq profile $svc"
+            ln -f -s /usr/local/etc/dnsmasq.available/$svc /usr/local/etc/dnsmasq.enabled
+        fi
+    done
+
+    log reload dnsmasq
+    launchctl stop homebrew.mxcl.dnsmasq-regex
+    launchctl start homebrew.mxcl.dnsmasq-regex
+
+    log reload $DNS_SERVICE
     killall -HUP $DNS_SERVICE
 }
 
