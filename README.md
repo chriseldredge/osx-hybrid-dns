@@ -17,14 +17,12 @@ Install
 1. Install [Homebrew](http://brew.sh/)
 1. Run `brew install ./dnsmasq-regex.rb` (a patched version of dnsmasq that supports regular expressions)
 1. `cp -R dns-watch/ dnsmasq.available/ dnsmasq.enabled/ dnsmasq.conf /usr/local/etc`
-1. `sudo launchctl load /usr/local/etc/dns-watch/local-dns.plist`
-1. `sudo launchctl load /usr/local/etc/dns-watch/vpn-dns.plist`
+1. `sudo launchctl load /usr/local/etc/dns-watch/io.eldredge.dns-watch.plist`
 
 Configure
 =========
 
 Edit these files in `/usr/local/etc` with your custom settings:
 
-* dns-watch/settings
 * dnsmasq.available/local.conf
-* dnsmasq.available/vpn.conf
+* `ln -s /usr/local/etc/dnsmasq.available/local.conf /usr/local/etc/dnsmasq.enabled`
