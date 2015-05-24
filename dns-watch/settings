@@ -1,5 +1,6 @@
 #!/bin/bash
 
 DNS_SERVICE=mDNSResponder
+DNSMASQ_SERVICE=homebrew.mxcl.dnsmasq-regex
 LOG=/var/log/dns-watch
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

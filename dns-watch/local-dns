@@ -93,9 +93,9 @@ EOT
         fi
     done
 
-    log reload dnsmasq
-    launchctl stop homebrew.mxcl.dnsmasq-regex
-    launchctl start homebrew.mxcl.dnsmasq-regex
+    log reload $DNSMASQ_SERVICE
+    launchctl stop $DNSMASQ_SERVICE
+    launchctl start $DNSMASQ_SERVICE
 
     log reload $DNS_SERVICE
     killall -HUP $DNS_SERVICE
