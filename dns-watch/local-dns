@@ -63,17 +63,6 @@ function go {
         done
     fi
 
-    log setting $PRIMARY_SERVICE DNS to 127.0.0.1
-
-    #TODO: determine correct search domains to use based on active services
-    scutil <<-EOT
-        open
-        get State:/Network/Service/$PRIMARY_SERVICE/DNS
-        d.add ServerAddresses * 127.0.0.1
-        set State:/Network/Service/$PRIMARY_SERVICE/DNS
-        close
-EOT
-
     shopt -s nullglob
     ACTIVE_PROFILES=(/usr/local/etc/dnsmasq.enabled/*.profile)
 
@@ -92,6 +81,25 @@ EOT
             ln -f -s /usr/local/etc/dnsmasq.available/${svc}.profile /usr/local/etc/dnsmasq.enabled
         fi
     done
+
+    # add search domains from enabled profiles
+    SEARCH_DOMAINS=$(awk -F/ '/^server=/ {$1=$NF=""; print $0}' /usr/local/etc/dnsmasq.enabled/*)
+    SEARCH_DOMAINS="$SEARCH_DOMAINS $(scutil --dns | awk -F: '/search domain/ {print $2}')"
+    SEARCH_DOMAINS=$(echo $SEARCH_DOMAINS | tr ' ' \\n | sort -u | tr \\n ' ')
+
+    tmp=/tmp/$$.scutil
+    cat >$tmp <<-EOT
+        open
+        get State:/Network/Service/$PRIMARY_SERVICE/DNS
+        d.add ServerAddresses * 127.0.0.1
+        d.add SearchDomains * $SEARCH_DOMAINS
+        set State:/Network/Service/$PRIMARY_SERVICE/DNS
+        close
+EOT
+
+    log setting $PRIMARY_SERVICE DNS to 127.0.0.1 with search domains $SEARCH_DOMAINS
+    scutil >/dev/null </$tmp
+    rm -f $tmp
 
     log reload $DNSMASQ_SERVICE
     launchctl stop $DNSMASQ_SERVICE
